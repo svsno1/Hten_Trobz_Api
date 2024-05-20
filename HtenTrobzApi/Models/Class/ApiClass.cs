@@ -49,4 +49,53 @@
         public UomInput? Uom { get; set; }
         public string Type { get; set; } = string.Empty;
     }
+
+    public class SiteInput
+    {
+        public string JobCode { get; set; } = string.Empty;
+        public string JobName { get; set; } = string.Empty;
+        public string JobAddress { get; set; } = string.Empty;
+    }
+
+    public class TruckInput
+    {
+        public string CarCode { get; set; } = string.Empty;
+        public string CarNo { get; set; } = string.Empty;
+    }
+
+    public class DriverInput
+    {
+        public string DriverCode { get; set; } = string.Empty;
+        public string DriverName { get; set; } = string.Empty;
+    }
+
+    public class SOInput
+    {
+        public DateTime VcDate { get; set; }
+        public string VcNo { get; set;} = string.Empty;
+        public string CusCode { get; set;} = string.Empty;
+        public string ContractNo { get; set;} = string.Empty;
+        public Factory? Factory { get; set; }
+        public MixingStation? MixingStation { get; set; }
+        public List<SODetailInput> SoDetails { get; set; } = new List<SODetailInput>();
+    }
+
+    public class SODetailInput
+    {
+        public string ItemCode {  get; set; } = string.Empty;
+        public string ItemName {  get; set; } = string.Empty;
+        public double Quantity { get; set; }
+    }
+
+    public class Factory
+    {
+        public string Code {  get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class MixingStation
+    {
+        public int Code { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
 }

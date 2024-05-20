@@ -11,8 +11,8 @@ namespace HtenTrobzApi.Models
         public virtual DbSet<Driver> Drivers { get; set; } = null!;
         public virtual DbSet<H00member> H00members { get; set; } = null!;
         public virtual DbSet<MaterialList> MaterialLists { get; set; } = null!;
-        public virtual DbSet<Order> Orders { get; set; } = null!;
-        public virtual DbSet<OrderDetail> OrderDetails { get; set; } = null!;
+        public virtual DbSet<SaleContract> SaleContracts { get; set; } = null!;
+        public virtual DbSet<SaleContractDetail> SaleContractDetails { get; set; } = null!;
         public virtual DbSet<Site> Sites { get; set; } = null!;
         public virtual DbSet<Truck> Trucks { get; set; } = null!;
 
@@ -188,31 +188,25 @@ namespace HtenTrobzApi.Models
                 entity.Property(e => e.Unit).HasMaxLength(20);
             });
 
-            modelBuilder.Entity<Order>(entity =>
+            modelBuilder.Entity<SaleContract>(entity =>
             {
+                entity.ToTable("SaleContract");
+
                 entity.Property(e => e.Id).HasColumnName("ID");
 
-                entity.Property(e => e.BizdocType).HasMaxLength(1);
-
-                entity.Property(e => e.Category).HasMaxLength(100);
-
-                entity.Property(e => e.Code).HasMaxLength(50);
-
-                entity.Property(e => e.CodePlant).HasMaxLength(50);
-
-                entity.Property(e => e.Contact).HasMaxLength(50);
+                entity.Property(e => e.Code).HasMaxLength(30);
 
                 entity.Property(e => e.CreateLog)
                     .HasColumnType("datetime")
                     .HasColumnName("Create_Log");
 
                 entity.Property(e => e.CustomerCode)
-                    .HasMaxLength(50)
+                    .HasMaxLength(30)
                     .HasColumnName("Customer_Code");
 
-                entity.Property(e => e.Description01).HasMaxLength(255);
+                entity.Property(e => e.Description01).HasMaxLength(100);
 
-                entity.Property(e => e.Description02).HasMaxLength(255);
+                entity.Property(e => e.Description02).HasMaxLength(100);
 
                 entity.Property(e => e.EmployeeCode).HasMaxLength(20);
 
@@ -222,60 +216,28 @@ namespace HtenTrobzApi.Models
 
                 entity.Property(e => e.OrderDate).HasColumnType("datetime");
 
-                entity.Property(e => e.PlantNo).HasColumnName("Plant_No");
-
                 entity.Property(e => e.SiteCode)
-                    .HasMaxLength(50)
+                    .HasMaxLength(30)
                     .HasColumnName("Site_Code");
-
-                entity.Property(e => e.Sync)
-                    .HasMaxLength(1)
-                    .IsUnicode(false)
-                    .HasColumnName("sync")
-                    .IsFixedLength();
 
                 entity.Property(e => e.UserChange).HasMaxLength(50);
 
                 entity.Property(e => e.UserCreate).HasMaxLength(50);
             });
 
-            modelBuilder.Entity<OrderDetail>(entity =>
+            modelBuilder.Entity<SaleContractDetail>(entity =>
             {
-                entity.ToTable("OrderDetail");
-
-                entity.Property(e => e.AdditivesCode).HasMaxLength(50);
-
-                entity.Property(e => e.CodePlant).HasMaxLength(50);
+                entity.ToTable("SaleContractDetail");
 
                 entity.Property(e => e.Description01).HasMaxLength(50);
 
-                entity.Property(e => e.IntensityCode).HasMaxLength(50);
+                entity.Property(e => e.GradeSaleCode).HasMaxLength(50);
 
-                entity.Property(e => e.NotesProduct).HasMaxLength(255);
-
-                entity.Property(e => e.OrderCode).HasMaxLength(50);
+                entity.Property(e => e.NotesProduct).HasMaxLength(50);
 
                 entity.Property(e => e.OrderedM3).HasColumnName("Ordered_M3");
 
-                entity.Property(e => e.PlantNo).HasColumnName("Plant_No");
-
-                entity.Property(e => e.ProductedM3).HasColumnName("Producted_M3");
-
-                entity.Property(e => e.PumpList)
-                    .HasMaxLength(2000)
-                    .IsUnicode(false);
-
-                entity.Property(e => e.RecipeCode).HasMaxLength(50);
-
-                entity.Property(e => e.RowId).HasMaxLength(16);
-
-                entity.Property(e => e.SlumpCode).HasMaxLength(50);
-
-                entity.Property(e => e.Sync)
-                    .HasMaxLength(1)
-                    .IsUnicode(false)
-                    .HasColumnName("sync")
-                    .IsFixedLength();
+                entity.Property(e => e.SaleContractCode).HasMaxLength(30);
             });
 
             modelBuilder.Entity<Site>(entity =>

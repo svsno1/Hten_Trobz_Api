@@ -20,4 +20,4 @@ namespace HtenTrobzApi.Models
     }
 }
 
-//Scaffold-DbContext "Server=NAT;Database=HTEN-EPR-CBP-NAMNGUYEN;user=sa;password=123456;Trust Server Certificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Context "HtenContext" -f -Table H00MEMBER,Customer,Site,Truck,Drivers,MaterialList,Orders,OrderDetail
+//Scaffold-DbContext "Server=NAT;Database=HTEN-EPR-CBP-NAMNGUYEN;user=sa;password=123456;Trust Server Certificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -Context "HtenContext" -f -Table H00MEMBER,Customer,Site,Truck,Drivers,MaterialList,SaleContract,SaleContractDetail

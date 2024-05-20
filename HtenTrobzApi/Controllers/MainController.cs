@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using System.Diagnostics.Contracts;
 using System.Security.Claims;
 using System.Text;
 
@@ -80,7 +81,7 @@ namespace HtenTrobzApi.Controllers
                 "getJobs" => context.Sites.FirstOrDefault(o => o.Code == input.code),
                 "getVehicle" => context.Trucks.FirstOrDefault(o => o.Code == input.code),
                 "getDrivers" => context.Drivers.FirstOrDefault(o => o.Code == input.code),
-                "getSO" => context.Orders.FirstOrDefault(o => o.Code == input.code),
+                "getSO" => context.SaleContracts.FirstOrDefault(o => o.Code == input.code),
                 _ => null
             };
 
@@ -89,12 +90,12 @@ namespace HtenTrobzApi.Controllers
                 switch (input.endpoint)
                 {
                     case "getSO":
-                        var orderDetail = context.OrderDetails.FirstOrDefault(o => o.OrderCode == input.code);
-                        if (orderDetail != null)
+                        var orderDetail = context.SaleContractDetails.Where(o => o.SaleContractCode == input.code).ToList();
+                        if (orderDetail?.Count > 0)
                         {
-                            context.OrderDetails.Remove(orderDetail);
+                            context.SaleContractDetails.RemoveRange(orderDetail);
                         }
-                        context.Orders.Remove((Order)entity);
+                        context.SaleContracts.Remove((SaleContract)entity);
                         break;
                     default:
                         context.Remove(entity);
@@ -116,6 +117,10 @@ namespace HtenTrobzApi.Controllers
             {
                 "getItems" => new { domain = "[('default_code','=','" + input.code + "')]" },
                 "getCustomers" => new { domain = "[('ref','=','" + input.code + "')]" },
+                "getJobs" => new { domain = "[('code','=','" + input.code + "')]" },
+                "getVehicle" => new { domain = "[('code','=','" + input.code + "')]" },
+                "getDrivers" => new { domain = "[('code','=','" + input.code + "')]" },
+                "getSO" => new { domain = "[('name','=','" + input.code + "')]" },
                 _ => null
             };
 
@@ -137,6 +142,10 @@ namespace HtenTrobzApi.Controllers
             {
                 "getItems" => ProcessItemResponse(jsonResult, input, context, user),
                 "getCustomers" => ProcessCustomerResponse(jsonResult, input, context, user),
+                "getJobs" => ProcessSiteResponse(jsonResult, input, context, user),
+                "getVehicle" => ProcessTruckResponse(jsonResult, input, context, user),
+                "getDrivers" => ProcessDriverResponse(jsonResult, input, context, user),
+                "getSO" => ProcessSOResponse(jsonResult, input, context, user),
                 _ => "Invalid endpoint"
             };
         }
@@ -220,5 +229,178 @@ namespace HtenTrobzApi.Controllers
 
             return "Error processing customers";
         }
+
+        private string ProcessSiteResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        {
+            var siteRes = JsonConvert.DeserializeObject<ApiReponse<SiteInput>>(jsonResult);
+            if (siteRes?.data != null && siteRes.error == null)
+            {
+                foreach (var item in siteRes.data)
+                {
+                    if (input.type.ToUpper() == "CREATE")
+                    {
+                        var site = new Site
+                        {
+                            Code = item.JobCode,
+                            Name = item.JobName,
+                            AddressLine1 = item.JobAddress,
+                            CreateLog = DateTime.Now,
+                            UserCreate = user,
+                        };
+                        context.Sites.Add(site);
+                    }
+                    else if (input.type.ToUpper() == "UPDATE")
+                    {
+                        var site = context.Sites.FirstOrDefault(o => o.Code == item.JobCode);
+                        if (site != null)
+                        {
+                            site.Name = item.JobName;
+                            site.AddressLine1 = item.JobAddress;
+                            site.LastModifyLog = DateTime.Now;
+                            site.UserChange = user;
+                        }
+                    }
+                }
+
+                context.SaveChanges();
+                return "OK";
+            }
+
+            return "Error processing sites";
+        }
+
+        private string ProcessTruckResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        {
+            var res = JsonConvert.DeserializeObject<ApiReponse<TruckInput>>(jsonResult);
+            if (res?.data != null && res.error == null)
+            {
+                foreach (var item in res.data)
+                {
+                    if (input.type.ToUpper() == "CREATE")
+                    {
+                        var truck = new Truck
+                        {
+                            Code = item.CarCode,
+                            PlateNumber = item.CarNo,
+                            CreateLog = DateTime.Now,
+                            UserCreate = user,
+                        };
+                        context.Trucks.Add(truck);
+                    }
+                    else if (input.type.ToUpper() == "UPDATE")
+                    {
+                        var truck = context.Trucks.FirstOrDefault(o => o.Code == item.CarCode);
+                        if (truck != null)
+                        {
+                            truck.PlateNumber = item.CarNo;
+                            truck.LastModifyLog = DateTime.Now;
+                            truck.UserChange = user;
+                        }
+                    }
+                }
+
+                context.SaveChanges();
+                return "OK";
+            }
+
+            return "Error processing trucks";
+        }
+
+        private string ProcessDriverResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        {
+            var res = JsonConvert.DeserializeObject<ApiReponse<DriverInput>>(jsonResult);
+            if (res?.data != null && res.error == null)
+            {
+                foreach (var item in res.data)
+                {
+                    if (input.type.ToUpper() == "CREATE")
+                    {
+                        var driver = new Driver
+                        {
+                            Code = item.DriverCode,
+                            Name = item.DriverName,
+                            CreateLog = DateTime.Now,
+                            UserCreate = user,
+                        };
+                        context.Drivers.Add(driver);
+                    }
+                    else if (input.type.ToUpper() == "UPDATE")
+                    {
+                        var driver = context.Drivers.FirstOrDefault(o => o.Code == item.DriverCode);
+                        if (driver != null)
+                        {
+                            driver.Name = item.DriverName;
+                            driver.LastModifyLog = DateTime.Now;
+                            driver.UserChange = user;
+                        }
+                    }
+                }
+
+                context.SaveChanges();
+                return "OK";
+            }
+
+            return "Error processing drivers";
+        }
+
+        private string ProcessSOResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        {
+            var res = JsonConvert.DeserializeObject<ApiReponse<SOInput>>(jsonResult);
+            if (res?.data != null && res.error == null)
+            {
+                bool isCreate = input.type.ToUpper() == "CREATE";
+
+                foreach (var item in res.data)
+                {
+                    SaleContract? contract;
+
+                    if (isCreate)
+                    {
+                        contract = new SaleContract
+                        {
+                            Code = item.VcNo,
+                            CustomerCode = item.CusCode,
+                            OrderDate = item.VcDate,
+                            CreateLog = DateTime.Now,
+                            UserCreate = user,
+                        };
+                        context.SaleContracts.Add(contract);
+                    }
+                    else
+                    {
+                        contract = context.SaleContracts.FirstOrDefault(o => o.Code == item.VcNo);
+                        if (contract != null)
+                        {
+                            contract.CustomerCode = item.CusCode;
+                            contract.OrderDate = item.VcDate;
+                            contract.LastModifyLog = DateTime.Now;
+                            contract.UserChange = user;
+
+                            // Remove existing details
+                            var existingDetails = context.SaleContractDetails.Where(o => o.SaleContractCode == item.VcNo).ToList();
+                            context.SaleContractDetails.RemoveRange(existingDetails);
+                        }
+                    }
+
+                    // Add new contract details
+                    var newDetails = item.SoDetails.Select(detail => new SaleContractDetail
+                    {
+                        SaleContractCode = item.VcNo,
+                        GradeSaleCode = detail.ItemCode,
+                        Description01 = detail.ItemName,
+                        OrderedM3 = detail.Quantity,
+                        Duyet = true,
+                    }).ToList();
+
+                    context.SaleContractDetails.AddRange(newDetails);
+                }
+
+                context.SaveChanges();
+                return "OK";
+            }
+
+            return "Error processing SO";
+        }
+
     }
 }
