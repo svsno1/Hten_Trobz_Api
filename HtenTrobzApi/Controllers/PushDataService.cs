@@ -1,5 +1,7 @@
 ﻿using HtenTrobzApi.Models;
+using HtenTrobzApi.TruckModels;
 using System.Text;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace HtenTrobzApi
 {
@@ -9,8 +11,9 @@ namespace HtenTrobzApi
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                _ = PushDeliveryData();
-                _ = PushIssueData();
+                //_ = PushDeliveryData();
+                //_ = PushIssueData();
+                //_ = PushWeightData();
 
                 await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
             }
@@ -168,5 +171,72 @@ namespace HtenTrobzApi
             }
         }
 
+        public async Task PushWeightData()
+        {
+            var context = new HtenContext();
+            var truckContext = new TruckContext();
+
+            try
+            {
+                var query = (from T in truckContext.TblTickets
+                             join M in truckContext.TblMaterials on T.MaterialRef equals M.Id
+                             join P in truckContext.TblProviders on T.ProviderRef equals P.Id into providerGroup
+                             from P in providerGroup.DefaultIfEmpty()
+                             join U in truckContext.TblUsers on T.GrossOperConfirm equals U.Id into userGroup
+                             from U in userGroup.DefaultIfEmpty()
+                             where T.Sync != "2"
+                             select new
+                             {
+                                 T.Code,
+                                 MatCode = M.Code,
+                                 MatName = M.Name,
+                                 T.MatGroup,
+                                 T.NetWeight,
+                                 Uom = "kg",
+                                 VendorName = P.Name,
+                                 TruckPlateNo = T.TruckPlateNumber,
+                                 T.GrossDatetime,
+                                 T.DriverName,
+                                 EmployeeName = U.UserName,
+                                 LeadSealNo = T.KepChi,
+                                 Note = T.KepChi
+                             })
+                         .Take(100)
+                         .ToList();
+
+                var jsonResult = Newtonsoft.Json.JsonConvert.SerializeObject(query);
+
+                using (var client = new HttpClient())
+                {
+                    var content = new StringContent(jsonResult, Encoding.UTF8, "application/json");
+                    client.DefaultRequestHeaders.Add("Authorization", "b972feef41f0f0f0d55acfebf0985ef1b89fb12c84");
+                    var response = await client.PostAsync("https://phudoanh-staging.trobz.com/setWeighbridge", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var ticketCodes = query.Select(q => q.Code).ToList();
+                        var ticketsToUpdate = truckContext.TblTickets.Where(t => ticketCodes.Contains(t.Code)).ToList();
+
+                        foreach (var ticket in ticketsToUpdate)
+                        {
+                            ticket.Sync = "2";
+                        }
+
+                        truckContext.SaveChanges();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FastErrorLog log = new FastErrorLog()
+                {
+                    Message = ex.Message,
+                    CreatedDate = DateTime.Now,
+                };
+
+                context.FastErrorLogs.Add(log);
+                context.SaveChanges();
+            }
+        }
     }
 }

@@ -33,6 +33,7 @@ namespace HtenTrobzApi.TruckModels
         public long? SheetNoCbp { get; set; }
         public string? SealNoCbp { get; set; }
         public int? PlantNoCbp { get; set; }
+        public string? Sync { get; set; }
 
         public virtual TblUser? GrossOperConfirmNavigation { get; set; }
         public virtual TblMaterial? MaterialRefNavigation { get; set; }

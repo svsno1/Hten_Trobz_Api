@@ -163,6 +163,11 @@ namespace HtenTrobzApi.TruckModels
                     .HasMaxLength(50)
                     .HasColumnName("SYN");
 
+                entity.Property(e => e.Sync)
+                    .HasMaxLength(1)
+                    .IsUnicode(false)
+                    .IsFixedLength();
+
                 entity.Property(e => e.TareDatetime).HasColumnType("datetime");
 
                 entity.Property(e => e.TruckPlateNumber).HasMaxLength(50);
