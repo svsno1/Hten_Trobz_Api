@@ -164,7 +164,7 @@ namespace HtenTrobzApi.Controllers
                             ComName = item.ItemCode,
                             Description = item.ItemName,
                             Unit = item.Uom?.Name,
-                            Density = item.Uom?.Ratio,
+                            Density = item.Uom?.Ratio ?? 1,
                         };
                         context.MaterialLists.Add(material);
                     }

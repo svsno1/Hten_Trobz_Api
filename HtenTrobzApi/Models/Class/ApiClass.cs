@@ -98,4 +98,51 @@
         public int Code { get; set; }
         public string Name { get; set; } = string.Empty;
     }
+
+    public class TicketDto
+    {
+        public string YourID { get; set; } = string.Empty;
+        public string CusID { get; set; } = string.Empty;
+        public string JobID { get; set; } = string.Empty;
+        public string VcNo { get; set; } = string.Empty;
+        public string VehicleID { get; set; } = string.Empty;
+        public string DriverID { get; set; } = string.Empty;
+        public string ContractID { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
+        public DateTime VcDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public List<MaterialArchDto> Items { get; set; } = new List<MaterialArchDto>();
+    }
+
+    public class MaterialArchDto
+    {
+        public string Code { get; set; } = string.Empty;
+        public double Sl_Dat { get; set; }
+        public double Quantity { get; set; }
+        public double AccumulatedQTY { get; set; }
+        public string Uom { get; set; } = string.Empty;
+    }
+
+    public class TicketIssue
+    {
+        public string YourID { get; set; } = string.Empty;
+        public string CusID { get; set; } = string.Empty;
+        public string JobID { get; set; } = string.Empty;
+        public string VcNo { get; set; } = string.Empty;
+        public string VehicleID { get; set; } = string.Empty;
+        public string DriverID { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string ProductID { get; set; } = string.Empty;
+        public List<MaterialArchIssue> Items { get; set; } = new List<MaterialArchIssue>();
+    }
+
+    public class MaterialArchIssue
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public double Quantity { get; set; }
+        public string Uom { get; set; } = string.Empty;
+    }
+
 }
