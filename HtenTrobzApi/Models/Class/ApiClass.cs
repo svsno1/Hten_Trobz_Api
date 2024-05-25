@@ -36,18 +36,37 @@
         public string Note { get; set; } = string.Empty;
     }
 
+    public class VendorInput
+    {
+        public string VendorCode { get; set; } = string.Empty;
+        public string VendorName { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
+    }
+
     public class UomInput
     {
         public string Name { get; set; } = string.Empty;
         public double Ratio { get; set; }
     }
 
+    public class CategoryInput
+    {
+        public string Name { get; set; } = string.Empty;
+        public string TypeMat { get; set; } = string.Empty;
+    }
+
     public class ItemInput
     {
         public string ItemCode { get; set; } = string.Empty;
         public string ItemName { get; set; } = string.Empty;
+        public string Settlement { get; set; } = string.Empty;
+        public string SaleDescription { get; set; } = string.Empty;
+        public string Note { get; set; } = string.Empty;
         public UomInput? Uom { get; set; }
-        public string Type { get; set; } = string.Empty;
+        public CategoryInput? Category {  get; set; }
+        public int IsConcrete { get; set; }
     }
 
     public class SiteInput
@@ -61,6 +80,8 @@
     {
         public string CarCode { get; set; } = string.Empty;
         public string CarNo { get; set; } = string.Empty;
+        public double? Capacity {  get; set; }
+        public CodeName? Driver { get; set; }
     }
 
     public class DriverInput
@@ -73,10 +94,7 @@
     {
         public DateTime VcDate { get; set; }
         public string VcNo { get; set;} = string.Empty;
-        public string CusCode { get; set;} = string.Empty;
-        public string ContractNo { get; set;} = string.Empty;
-        public Factory? Factory { get; set; }
-        public MixingStation? MixingStation { get; set; }
+        public CodeName? Customer { get; set; }
         public List<SODetailInput> SoDetails { get; set; } = new List<SODetailInput>();
     }
 
@@ -87,15 +105,9 @@
         public double Quantity { get; set; }
     }
 
-    public class Factory
+    public class CodeName
     {
-        public string Code {  get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-    }
-
-    public class MixingStation
-    {
-        public int Code { get; set; }
+        public string Code { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
     }
 

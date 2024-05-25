@@ -10,12 +10,14 @@ namespace HtenTrobzApi.Models
         public virtual DbSet<Customer> Customers { get; set; } = null!;
         public virtual DbSet<Driver> Drivers { get; set; } = null!;
         public virtual DbSet<FastErrorLog> FastErrorLogs { get; set; } = null!;
+        public virtual DbSet<GradeSale> GradeSales { get; set; } = null!;
         public virtual DbSet<H00member> H00members { get; set; } = null!;
         public virtual DbSet<MaterialArch> MaterialArches { get; set; } = null!;
         public virtual DbSet<MaterialList> MaterialLists { get; set; } = null!;
         public virtual DbSet<SaleContract> SaleContracts { get; set; } = null!;
         public virtual DbSet<SaleContractDetail> SaleContractDetails { get; set; } = null!;
         public virtual DbSet<Site> Sites { get; set; } = null!;
+        public virtual DbSet<TblProvider> TblProviders { get; set; } = null!;
         public virtual DbSet<Ticket> Tickets { get; set; } = null!;
         public virtual DbSet<Truck> Trucks { get; set; } = null!;
 
@@ -110,6 +112,46 @@ namespace HtenTrobzApi.Models
                 entity.Property(e => e.Id).HasColumnName("ID");
 
                 entity.Property(e => e.CreatedDate).HasColumnType("datetime");
+            });
+
+            modelBuilder.Entity<GradeSale>(entity =>
+            {
+                entity.ToTable("GradeSale");
+
+                entity.Property(e => e.Id).HasColumnName("ID");
+
+                entity.Property(e => e.Code).HasMaxLength(50);
+
+                entity.Property(e => e.CreateLog)
+                    .HasColumnType("datetime")
+                    .HasColumnName("Create_Log");
+
+                entity.Property(e => e.Description01).HasMaxLength(50);
+
+                entity.Property(e => e.Description02).HasMaxLength(50);
+
+                entity.Property(e => e.LastModifyLog)
+                    .HasColumnType("datetime")
+                    .HasColumnName("LastModify_Log");
+
+                entity.Property(e => e.Note).HasMaxLength(100);
+
+                entity.Property(e => e.RecipeList)
+                    .HasMaxLength(2000)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.Rv)
+                    .IsRowVersion()
+                    .IsConcurrencyToken()
+                    .HasColumnName("RV");
+
+                entity.Property(e => e.Slump).HasMaxLength(50);
+
+                entity.Property(e => e.Type).HasMaxLength(50);
+
+                entity.Property(e => e.UserChange).HasMaxLength(50);
+
+                entity.Property(e => e.UserCreate).HasMaxLength(50);
             });
 
             modelBuilder.Entity<H00member>(entity =>
@@ -357,6 +399,48 @@ namespace HtenTrobzApi.Models
                 entity.Property(e => e.UserCreate).HasMaxLength(50);
 
                 entity.Property(e => e.Zone).HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<TblProvider>(entity =>
+            {
+                entity.HasKey(e => e.Code)
+                    .HasName("PK__tblProvi__A25C5AA6F89A08FE");
+
+                entity.ToTable("tblProvider");
+
+                entity.Property(e => e.Code).HasMaxLength(50);
+
+                entity.Property(e => e.Address).HasMaxLength(100);
+
+                entity.Property(e => e.Contact).HasMaxLength(50);
+
+                entity.Property(e => e.CreateLog)
+                    .HasColumnType("datetime")
+                    .HasColumnName("Create_Log");
+
+                entity.Property(e => e.HotKey).HasMaxLength(50);
+
+                entity.Property(e => e.LastModifyLog)
+                    .HasColumnType("datetime")
+                    .HasColumnName("LastModify_Log");
+
+                entity.Property(e => e.LastSynchTime).HasColumnType("datetime");
+
+                entity.Property(e => e.Mail).HasMaxLength(50);
+
+                entity.Property(e => e.Name).HasMaxLength(100);
+
+                entity.Property(e => e.Note)
+                    .HasMaxLength(100)
+                    .HasComment("Ghi chu");
+
+                entity.Property(e => e.Syn)
+                    .HasMaxLength(50)
+                    .HasColumnName("SYN");
+
+                entity.Property(e => e.UserChanged).HasMaxLength(50);
+
+                entity.Property(e => e.UserCreated).HasMaxLength(50);
             });
 
             modelBuilder.Entity<Ticket>(entity =>
