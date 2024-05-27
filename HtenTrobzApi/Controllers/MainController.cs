@@ -135,10 +135,10 @@ namespace HtenTrobzApi.Controllers
             {
                 "getItems" => new { domain = "[('default_code','=','" + input.code + "')]" },
                 "getCustomers" => new { domain = "[('ref','=','" + input.code + "')]" },
-                "getVendors" => new { domain = "[('code','=','" + input.code + "')]" },
+                "getVendors" => new { domain = "[('ref','=','" + input.code + "')]" },
                 "getJobs" => new { domain = "[('code','=','" + input.code + "')]" },
                 "getVehicle" => new { domain = "[('code','=','" + input.code + "')]" },
-                "getDrivers" => new { domain = "[('code','=','" + input.code + "')]" },
+                "getDrivers" => new { domain = "[('driver_code','=','" + input.code + "')]" },
                 "getSO" => new { domain = "[('name','=','" + input.code + "')]" },
                 _ => null
             };
