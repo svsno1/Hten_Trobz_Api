@@ -1,5 +1,6 @@
 ﻿using HtenTrobzApi.Models;
 using HtenTrobzApi.TruckModels;
+using Microsoft.Extensions.Options;
 using System.Text;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
@@ -7,6 +8,13 @@ namespace HtenTrobzApi
 {
     public class PushDataService : BackgroundService
     {
+        private readonly MyConfigs _configs;
+
+        public PushDataService(IOptions<MyConfigs> configs)
+        {
+            _configs = configs.Value;
+        }
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -15,7 +23,7 @@ namespace HtenTrobzApi
                 //_ = PushIssueData();
                 //_ = PushWeightData();
 
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(_configs.IntervalTimer), stoppingToken);
             }
         }
 
@@ -29,12 +37,12 @@ namespace HtenTrobzApi
                                     join materialArch in context.MaterialArches
                                     on new { ticket.CodePlant, ticket.PlantNo, ticket.SheetNo }
                                     equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId ?? 0 }
-                                    where ticket.Sync != "2"
+                                    where ticket.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
                                     select new
                                     {
                                         ticket,
                                         materialArch
-                                    }).Take(100);
+                                    }).Take(_configs.MaxRecord);
 
                 var groupedResultDelivery = queryDelivery
                     .GroupBy(x => x.ticket)
@@ -106,12 +114,12 @@ namespace HtenTrobzApi
                                  join materialArch in context.MaterialArches
                                  on new { ticket.CodePlant, ticket.PlantNo, ticket.SheetNo }
                                  equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId ?? 0 }
-                                 where materialArch.Sync != "2"
+                                 where materialArch.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
                                  select new
                                  {
                                      ticket,
                                      materialArch
-                                 }).Take(100);
+                                 }).Take(_configs.MaxRecord);
 
                 var groupedResultIssue = queryIssue
                     .GroupBy(x => x.ticket)
@@ -178,30 +186,34 @@ namespace HtenTrobzApi
 
             try
             {
-                var query = (from T in truckContext.TblTickets
-                             join M in truckContext.TblMaterials on T.MaterialRef equals M.Id
-                             join P in truckContext.TblProviders on T.ProviderRef equals P.Id into providerGroup
-                             from P in providerGroup.DefaultIfEmpty()
-                             join U in truckContext.TblUsers on T.GrossOperConfirm equals U.Id into userGroup
-                             from U in userGroup.DefaultIfEmpty()
-                             where T.Sync != "2"
+                var query = (from ticket in truckContext.TblTickets
+                             join material in truckContext.TblMaterials on ticket.MaterialRef equals material.Id
+                             join provider in truckContext.TblProviders on ticket.ProviderRef equals provider.Id into providerGroup
+                             from provider in providerGroup.DefaultIfEmpty()
+                             join user in truckContext.TblUsers on ticket.GrossOperConfirm equals user.Id into userGroup
+                             from user in userGroup.DefaultIfEmpty()
+                             join delivery in truckContext.TblTicketReceivedCbps on ticket.SheetNoCbp equals delivery.Idticket into deliveryGroup
+                             from delivery in deliveryGroup.DefaultIfEmpty()
+                             where ticket.Sync != "2" && ticket.GrossDatetime >= _configs.FromDate
                              select new
                              {
-                                 T.Code,
-                                 MatCode = M.Code,
-                                 MatName = M.Name,
-                                 T.MatGroup,
-                                 T.NetWeight,
+                                 ticket.Code,
+                                 POCode = delivery.OrderDescription01,
+                                 SOCode = delivery.OrderNo,
+                                 MatCode = material.Code,
+                                 MatName = material.Name,
+                                 ticket.MatGroup,
+                                 ticket.NetWeight,
                                  Uom = "kg",
-                                 VendorName = P.Name,
-                                 TruckPlateNo = T.TruckPlateNumber,
-                                 T.GrossDatetime,
-                                 T.DriverName,
-                                 EmployeeName = U.UserName,
-                                 LeadSealNo = T.KepChi,
-                                 Note = T.KepChi
+                                 VendorName = provider.Name,
+                                 TruckPlateNo = ticket.TruckPlateNumber,
+                                 ticket.GrossDatetime,
+                                 ticket.DriverName,
+                                 EmployeeName = user.UserName,
+                                 LeadSealNo = ticket.KepChi,
+                                 Note = ticket.KepChi
                              })
-                         .Take(100)
+                         .Take(_configs.MaxRecord)
                          .ToList();
 
                 var jsonResult = Newtonsoft.Json.JsonConvert.SerializeObject(query);

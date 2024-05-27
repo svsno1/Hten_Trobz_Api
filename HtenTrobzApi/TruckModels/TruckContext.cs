@@ -10,6 +10,7 @@ namespace HtenTrobzApi.TruckModels
         public virtual DbSet<TblMaterial> TblMaterials { get; set; } = null!;
         public virtual DbSet<TblProvider> TblProviders { get; set; } = null!;
         public virtual DbSet<TblTicket> TblTickets { get; set; } = null!;
+        public virtual DbSet<TblTicketReceivedCbp> TblTicketReceivedCbps { get; set; } = null!;
         public virtual DbSet<TblUser> TblUsers { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -193,6 +194,123 @@ namespace HtenTrobzApi.TruckModels
                     .WithMany(p => p.TblTicketTareOperConfirmNavigations)
                     .HasForeignKey(d => d.TareOperConfirm)
                     .HasConstraintName("FK_tblTicket_tblUser1");
+            });
+
+            modelBuilder.Entity<TblTicketReceivedCbp>(entity =>
+            {
+                entity.HasKey(e => e.Idticket);
+
+                entity.ToTable("tblTicketReceivedCBP");
+
+                entity.Property(e => e.Idticket)
+                    .ValueGeneratedNever()
+                    .HasColumnName("IDTicket");
+
+                entity.Property(e => e.AddressCustomer)
+                    .HasMaxLength(200)
+                    .HasColumnName("Address_Customer");
+
+                entity.Property(e => e.AddressSite)
+                    .HasMaxLength(200)
+                    .HasColumnName("Address_Site");
+
+                entity.Property(e => e.CodePlant).HasMaxLength(50);
+
+                entity.Property(e => e.Customer).HasMaxLength(200);
+
+                entity.Property(e => e.CustomerCode)
+                    .HasMaxLength(50)
+                    .HasColumnName("Customer_Code");
+
+                entity.Property(e => e.DaCan).HasColumnName("Da_Can");
+
+                entity.Property(e => e.DateTimeCan)
+                    .HasColumnType("datetime")
+                    .HasColumnName("DateTime_Can");
+
+                entity.Property(e => e.DateTimeMix)
+                    .HasColumnType("datetime")
+                    .HasColumnName("DateTime_Mix");
+
+                entity.Property(e => e.DateTimePrint)
+                    .HasColumnType("datetime")
+                    .HasColumnName("DateTime_Print");
+
+                entity.Property(e => e.DeliveryNoOrder)
+                    .HasMaxLength(20)
+                    .HasColumnName("Delivery_No_Order");
+
+                entity.Property(e => e.Driver).HasMaxLength(50);
+
+                entity.Property(e => e.DriverCode)
+                    .HasMaxLength(20)
+                    .HasColumnName("Driver_Code");
+
+                entity.Property(e => e.History).HasMaxLength(200);
+
+                entity.Property(e => e.KlCan).HasColumnName("Kl_can");
+
+                entity.Property(e => e.LastSynchTime).HasColumnType("datetime");
+
+                entity.Property(e => e.M3ThisTicket).HasColumnName("m3_ThisTicket");
+
+                entity.Property(e => e.Note).HasMaxLength(200);
+
+                entity.Property(e => e.OrderDescription01)
+                    .HasMaxLength(200)
+                    .HasColumnName("Order_Description01");
+
+                entity.Property(e => e.OrderDescription02)
+                    .HasMaxLength(200)
+                    .HasColumnName("Order_Description02");
+
+                entity.Property(e => e.OrderNo)
+                    .HasMaxLength(50)
+                    .HasColumnName("Order_No");
+
+                entity.Property(e => e.PlantNo).HasColumnName("Plant_No");
+
+                entity.Property(e => e.RcDescription01)
+                    .HasMaxLength(50)
+                    .HasColumnName("RC_Description01");
+
+                entity.Property(e => e.RcDescription02)
+                    .HasMaxLength(50)
+                    .HasColumnName("RC_Description02");
+
+                entity.Property(e => e.RcSlump)
+                    .HasMaxLength(50)
+                    .HasColumnName("RC_Slump");
+
+                entity.Property(e => e.RcType)
+                    .HasMaxLength(50)
+                    .HasColumnName("RC_Type");
+
+                entity.Property(e => e.RecipeCode)
+                    .HasMaxLength(50)
+                    .HasColumnName("Recipe_Code");
+
+                entity.Property(e => e.SealNo)
+                    .HasMaxLength(20)
+                    .HasColumnName("Seal_No");
+
+                entity.Property(e => e.SheetNo).HasColumnName("Sheet_No");
+
+                entity.Property(e => e.Site).HasMaxLength(200);
+
+                entity.Property(e => e.SiteCode)
+                    .HasMaxLength(50)
+                    .HasColumnName("Site_Code");
+
+                entity.Property(e => e.Syn)
+                    .HasMaxLength(50)
+                    .HasColumnName("SYN");
+
+                entity.Property(e => e.Truck).HasMaxLength(50);
+
+                entity.Property(e => e.TruckCode)
+                    .HasMaxLength(20)
+                    .HasColumnName("Truck_Code");
             });
 
             modelBuilder.Entity<TblUser>(entity =>

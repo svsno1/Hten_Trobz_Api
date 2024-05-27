@@ -20,4 +20,4 @@ namespace HtenTrobzApi.TruckModels
     }
 }
 
-//Scaffold-DbContext "Server=NAT;Database=HTENTruckScaleDb_NAT;user=sa;password=123456;Trust Server Certificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir TruckModels -Context "TruckContext" -f -Table tblTicket,tblMaterial,tblProvider,tblUser
+//Scaffold-DbContext "Server=NAT;Database=HTENTruckScaleDb_NAT;user=sa;password=123456;Trust Server Certificate=true;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir TruckModels -Context "TruckContext" -f -Table tblTicket,tblTicketReceivedCBP,tblMaterial,tblProvider,tblUser

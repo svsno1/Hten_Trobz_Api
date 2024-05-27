@@ -157,4 +157,10 @@
         public string Uom { get; set; } = string.Empty;
     }
 
+    public class MyConfigs
+    {
+        public int MaxRecord { get; set; }
+        public DateTime FromDate { get; set; }
+        public double IntervalTimer { get; set; }
+    }
 }
