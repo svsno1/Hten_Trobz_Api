@@ -1,8 +1,8 @@
 ﻿using HtenTrobzApi.Models;
 using HtenTrobzApi.TruckModels;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using System.Text;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace HtenTrobzApi
 {
@@ -19,8 +19,7 @@ namespace HtenTrobzApi
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                //_ = PushDeliveryData();
-                //_ = PushIssueData();
+                _ = PushDeliveryData();
                 //_ = PushWeightData();
 
                 await Task.Delay(TimeSpan.FromSeconds(_configs.IntervalTimer), stoppingToken);
@@ -33,135 +32,147 @@ namespace HtenTrobzApi
 
             try
             {
-                var queryDelivery = (from ticket in context.Tickets
-                                    join materialArch in context.MaterialArches
-                                    on new { ticket.CodePlant, ticket.PlantNo, ticket.SheetNo }
-                                    equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId ?? 0 }
-                                    where ticket.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
-                                    select new
-                                    {
-                                        ticket,
-                                        materialArch
-                                    }).Take(_configs.MaxRecord);
+                var query = (from ticket in context.Tickets
+                                     where ticket.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
+                                     orderby ticket.Idticket
+                                     select ticket)
+                     .Take(_configs.MaxRecord)
+                     .Join(context.MaterialArches,
+                           ticket => new { ticket.CodePlant, ticket.PlantNo, SheetNo = (long?)ticket.SheetNo },
+                           materialArch => new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId },
+                           (ticket, materialArch) => new
+                           {
+                               ticket.Idticket,
+                               ticket.TicketNo,
+                               ticket.CustomerCode,
+                               ticket.SiteCode,
+                               ticket.TruckCode,
+                               ticket.DriverCode,
+                               ticket.OrderDescription01,
+                               ticket.Note,
+                               ticket.DateTimeMix,
+                               ticket.M3Ordered,
+                               ticket.M3Delivered,
+                               ticket.RecipeCode,
+                               materialArch.CodeMaterial,
+                               materialArch.NameMaterial,
+                               materialArch.PvActualy,
+                               materialArch.UnitMaterial
+                           })
+                     .ToList();
 
-                var groupedResultDelivery = queryDelivery
-                    .GroupBy(x => x.ticket)
-                    .Select(g => new TicketDto
+                var groupedDelivery = query
+                    .GroupBy(x => new
+                    {
+                        x.Idticket,
+                        x.TicketNo,
+                        x.CustomerCode,
+                        x.SiteCode,
+                        x.TruckCode,
+                        x.DriverCode,
+                        x.OrderDescription01,
+                        x.Note,
+                        x.DateTimeMix,
+                        x.M3Ordered,
+                        x.M3Delivered,
+                        x.RecipeCode
+                    })
+                    .Select(g => new
                     {
                         YourID = g.Key.Idticket.ToString(),
-                        CusID = g.Key.CustomerCode ?? "",
-                        JobID = g.Key.SiteCode ?? "",
-                        VcNo = g.Key.TicketNo ?? "",
-                        VehicleID = g.Key.TruckCode ?? "",
-                        DriverID = g.Key.DriverCode ?? "",
-                        ContractID = g.Key.OrderDescription01 ?? "",
-                        Note = g.Key.Note ?? "",
-                        VcDate = g.Key.DateTimeMix ?? new DateTime(1900, 1, 1),
+                        VcNo = g.Key.TicketNo,
+                        CusCode = g.Key.CustomerCode,
+                        JobCode = g.Key.SiteCode,
+                        VehicleCode = g.Key.TruckCode,
+                        DriverCode = g.Key.DriverCode,
+                        ContractCode = g.Key.OrderDescription01,
+                        Note = g.Key.Note,
+                        VcDate = g.Key.DateTimeMix,
                         Status = "done",
-                        Items = g.Select(item => new MaterialArchDto
+                        Items = g.Select(x => new
                         {
-                            Code = item.materialArch.CodeMaterial ?? "",
-                            Sl_Dat = g.Key.M3Ordered ?? 0,
-                            Quantity = item.materialArch.PvActualy ?? 0,
-                            AccumulatedQTY = g.Key.M3Delivered ?? 0,
-                            Uom = item.materialArch.UnitMaterial ?? "",
+                            Code = x.CodeMaterial,
+                            Quantity = x.PvActualy,
+                            Uom = x.UnitMaterial,
+                            Sl_Dat = g.Key.M3Ordered,
+                            AccumulatedQTY = g.Key.M3Delivered
                         }).ToList()
                     })
                     .ToList();
 
-                var jsonResultDelivery = Newtonsoft.Json.JsonConvert.SerializeObject(groupedResultDelivery);
+                var groupedIssue = query
+                    .GroupBy(x => new
+                    {
+                        x.Idticket,
+                        x.TicketNo,
+                        x.CustomerCode,
+                        x.SiteCode,
+                        x.TruckCode,
+                        x.DriverCode,
+                        x.OrderDescription01,
+                        x.Note,
+                        x.DateTimeMix,
+                        x.M3Ordered,
+                        x.M3Delivered,
+                        x.RecipeCode
+                    })
+                    .Select(g => new
+                    {
+                        YourID = g.Key.Idticket.ToString(),
+                        VcNo = g.Key.TicketNo,
+                        CusCode = g.Key.CustomerCode,
+                        JobCode = g.Key.SiteCode,
+                        VehicleCode = g.Key.TruckCode,
+                        DriverCode = g.Key.DriverCode,
+                        Note = g.Key.Note,
+                        ProductCode = g.Key.RecipeCode,
+                        Items = g.Select(x => new
+                        {
+                            Code = x.CodeMaterial,
+                            Name = x.NameMaterial,
+                            Quantity = x.PvActualy,
+                            Uom = x.UnitMaterial
+                        }).ToList()
+                    })
+                    .ToList();
 
-                // HTTP POST request for setDelivery
+                var jsonResultDelivery = Newtonsoft.Json.JsonConvert.SerializeObject(groupedDelivery);
+                var jsonResultIssue = Newtonsoft.Json.JsonConvert.SerializeObject(groupedIssue);
+
                 using (var client = new HttpClient())
                 {
                     var contentDelivery = new StringContent(jsonResultDelivery, Encoding.UTF8, "application/json");
-                    client.DefaultRequestHeaders.Add("Authorization", "b972feef41f0f0f0d55acfebf0985ef1b89fb12c84");
-                    var responseDelivery = await client.PostAsync("https://phudoanh-staging.trobz.com/setDelivery", contentDelivery);
-
-                    if (responseDelivery.IsSuccessStatusCode)
+                    var requestDelivery = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setDelivery")
                     {
-                        // Update ticket.Sync to "2"
-                        var ticketsToUpdate = queryDelivery.Select(q => q.ticket).ToList();
-                        foreach (var ticket in ticketsToUpdate)
-                        {
-                            ticket.Sync = "2";
-                        }
+                        Content = contentDelivery
+                    };
+                    requestDelivery.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
+                    var responseDelivery = await client.SendAsync(requestDelivery);
+                    responseDelivery.EnsureSuccessStatusCode();
+                    var resultDelivery = await responseDelivery.Content.ReadAsStringAsync();
+                    var resDelivery = JsonConvert.DeserializeObject<TrobzResponse>(resultDelivery);
 
-                        context.SaveChanges();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                FastErrorLog log = new FastErrorLog()
-                {
-                    Message = ex.Message,
-                    CreatedDate = DateTime.Now,
-                };
-
-                context.FastErrorLogs.Add(log);
-                context.SaveChanges();
-            }
-        }
-
-        public async Task PushIssueData()
-        {
-            var context = new HtenContext();
-
-            try
-            {
-                var queryIssue = (from ticket in context.Tickets
-                                 join materialArch in context.MaterialArches
-                                 on new { ticket.CodePlant, ticket.PlantNo, ticket.SheetNo }
-                                 equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId ?? 0 }
-                                 where materialArch.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
-                                 select new
-                                 {
-                                     ticket,
-                                     materialArch
-                                 }).Take(_configs.MaxRecord);
-
-                var groupedResultIssue = queryIssue
-                    .GroupBy(x => x.ticket)
-                    .Select(g => new TicketIssue
-                    {
-                        YourID = g.Key.Idticket.ToString(),
-                        CusID = g.Key.CustomerCode ?? "",
-                        JobID = g.Key.SiteCode ?? "",
-                        VcNo = g.Key.TicketNo ?? "",
-                        VehicleID = g.Key.TruckCode ?? "",
-                        DriverID = g.Key.DriverCode ?? "",
-                        Note = g.Key.Note ?? "",
-                        Status = "done",
-                        ProductID = g.Key.RecipeCode ?? "",
-                        Items = g.Select(item => new MaterialArchIssue
-                        {
-                            Code = item.materialArch.CodeMaterial ?? "",
-                            Name = item.materialArch.NameMaterial ?? "",
-                            Quantity = item.materialArch.PvActualy ?? 0,
-                            Uom = item.materialArch.UnitMaterial ?? "",
-                        }).ToList()
-                    })
-                    .ToList();
-
-                var jsonResultIssue = Newtonsoft.Json.JsonConvert.SerializeObject(groupedResultIssue);
-
-                // HTTP POST request for setIssue
-                using (var client = new HttpClient())
-                {
                     var contentIssue = new StringContent(jsonResultIssue, Encoding.UTF8, "application/json");
-                    client.DefaultRequestHeaders.Add("Authorization", "b972feef41f0f0f0d55acfebf0985ef1b89fb12c84");
-                    var responseIssue = await client.PostAsync("https://phudoanh-staging.trobz.com/setIssue", contentIssue);
-
-                    if (responseIssue.IsSuccessStatusCode)
+                    var requestIssue = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setIssue")
                     {
-                        // Update materialArch.Sync to "2"
-                        var materialArchesToUpdate = queryIssue.Select(q => q.materialArch).ToList();
-                        foreach (var materialArch in materialArchesToUpdate)
-                        {
-                            materialArch.Sync = "2";
-                        }
+                        Content = contentIssue
+                    };
+                    requestIssue.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
+                    var responseIssue = await client.SendAsync(requestIssue);
+                    responseIssue.EnsureSuccessStatusCode();
+                    var resultIssue = await responseIssue.Content.ReadAsStringAsync();
+                    var resIssue = JsonConvert.DeserializeObject<TrobzResponse> (resultIssue);
 
+                    if (resDelivery != null && resDelivery.error == null && resIssue != null && resIssue.error == null)
+                    {
+                        foreach (var ticket in query.Select(q => q.Idticket).Distinct())
+                        {
+                            var dbTicket = context.Tickets.FirstOrDefault(t => t.Idticket == ticket);
+                            if (dbTicket != null)
+                            {
+                                dbTicket.Sync = "2";
+                            }
+                        }
                         context.SaveChanges();
                     }
                 }
@@ -198,8 +209,8 @@ namespace HtenTrobzApi
                              select new
                              {
                                  ticket.Code,
-                                 POCode = delivery.OrderDescription01,
-                                 SOCode = delivery.OrderNo,
+                                 POCode = delivery.OrderDescription01 ?? "",
+                                 SOCode = delivery.OrderNo ?? "",
                                  MatCode = material.Code,
                                  MatName = material.Name,
                                  ticket.MatGroup,
@@ -221,10 +232,17 @@ namespace HtenTrobzApi
                 using (var client = new HttpClient())
                 {
                     var content = new StringContent(jsonResult, Encoding.UTF8, "application/json");
-                    client.DefaultRequestHeaders.Add("Authorization", "b972feef41f0f0f0d55acfebf0985ef1b89fb12c84");
-                    var response = await client.PostAsync("https://phudoanh-staging.trobz.com/setWeighbridge", content);
+                    var request = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setWeighbridge")
+                    {
+                        Content = content
+                    };
+                    request.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
+                    var response = await client.SendAsync(request);
+                    response.EnsureSuccessStatusCode();
+                    var result = await response.Content.ReadAsStringAsync();
+                    var res = JsonConvert.DeserializeObject<TrobzResponse>(result);
 
-                    if (response.IsSuccessStatusCode)
+                    if (res != null && res.error == null)
                     {
                         var ticketCodes = query.Select(q => q.Code).ToList();
                         var ticketsToUpdate = truckContext.TblTickets.Where(t => ticketCodes.Contains(t.Code)).ToList();
