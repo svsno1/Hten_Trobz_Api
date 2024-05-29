@@ -20,6 +20,7 @@ namespace HtenTrobzApi
             while (!stoppingToken.IsCancellationRequested)
             {
                 _ = PushDeliveryData();
+                _ = PushIssueData();
                 _ = PushWeightData();
 
                 await Task.Delay(TimeSpan.FromSeconds(_configs.IntervalTimer), stoppingToken);
@@ -32,112 +33,33 @@ namespace HtenTrobzApi
 
             try
             {
-                var query = (from ticket in context.Tickets
-                                     where ticket.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
-                                     orderby ticket.Idticket
-                                     select ticket)
-                     .Take(_configs.MaxRecord)
-                     .Join(context.MaterialArches,
-                           ticket => new { ticket.CodePlant, ticket.PlantNo, SheetNo = (long?)ticket.SheetNo },
-                           materialArch => new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId },
-                           (ticket, materialArch) => new
-                           {
-                               ticket.Idticket,
-                               ticket.TicketNo,
-                               ticket.CustomerCode,
-                               ticket.SiteCode,
-                               ticket.TruckCode,
-                               ticket.DriverCode,
-                               ticket.OrderDescription01,
-                               ticket.Note,
-                               ticket.DateTimeMix,
-                               ticket.M3Ordered,
-                               ticket.M3Delivered,
-                               ticket.RecipeCode,
-                               materialArch.CodeMaterial,
-                               materialArch.NameMaterial,
-                               materialArch.PvActualy,
-                               materialArch.UnitMaterial
-                           })
-                     .ToList();
-
-                var groupedDelivery = query
-                    .GroupBy(ticket => new
+                var tickets = context.Tickets.Where(t => t.Sync != "2" && t.DateTimeMix >= _configs.FromDate).Take(_configs.MaxRecord).ToList();
+                var queryDelivery = tickets.Select(ticket => new
+                {
+                    YourID = ticket.Idticket.ToString(),
+                    VcNo = ticket.OrderDescription01,
+                    CusCode = ticket.CustomerCode,
+                    JobCode = ticket.SiteCode,
+                    VehicleCode = ticket.TruckCode,
+                    DriverCode = ticket.DriverCode,
+                    ContractCode = ticket.TicketNo,
+                    Note = ticket.Note,
+                    VcDate = (ticket.DateTimeMix ?? new DateTime(1900, 1, 1)).ToString("yyyy-MM-dd"),
+                    Status = "done",
+                    Items = new List<object>
                     {
-                        ticket.Idticket,
-                        ticket.TicketNo,
-                        ticket.CustomerCode,
-                        ticket.SiteCode,
-                        ticket.TruckCode,
-                        ticket.DriverCode,
-                        ticket.OrderDescription01,
-                        ticket.Note,
-                        ticket.DateTimeMix,
-                        ticket.M3Ordered,
-                        ticket.M3Delivered,
-                        ticket.RecipeCode
-                    })
-                    .Select(g => new
-                    {
-                        YourID = g.Key.Idticket.ToString(),
-                        VcNo = g.Key.TicketNo,
-                        CusCode = g.Key.CustomerCode,
-                        JobCode = g.Key.SiteCode,
-                        VehicleCode = g.Key.TruckCode,
-                        DriverCode = g.Key.DriverCode,
-                        ContractCode = g.Key.OrderDescription01,
-                        Note = g.Key.Note,
-                        VcDate = (g.Key.DateTimeMix ?? new DateTime(1900,1,1)).ToString("yyyy-MM-dd"),
-                        Status = "done",
-                        Items = g.Select(materialArch => new
+                        new
                         {
-                            Code = materialArch.CodeMaterial,
-                            Quantity = materialArch.PvActualy,
-                            Uom = materialArch.UnitMaterial,
-                            Sl_Dat = g.Key.M3Ordered,
-                            AccumulatedQTY = g.Key.M3Delivered
-                        }).ToList()
-                    })
-                    .ToList();
+                            Code = ticket.RcDescription01,
+                            Quantity = ticket.M3ThisTicket,
+                            Uom = "m3",
+                            Sl_Dat = ticket.M3Ordered,
+                            AccumulatedQTY = ticket.M3Delivered
+                        }
+                    }
+                }).ToList();
 
-                var groupedIssue = query
-                    .GroupBy(ticket => new
-                    {
-                        ticket.Idticket,
-                        ticket.TicketNo,
-                        ticket.CustomerCode,
-                        ticket.SiteCode,
-                        ticket.TruckCode,
-                        ticket.DriverCode,
-                        ticket.OrderDescription01,
-                        ticket.Note,
-                        ticket.DateTimeMix,
-                        ticket.M3Ordered,
-                        ticket.M3Delivered,
-                        ticket.RecipeCode
-                    })
-                    .Select(g => new
-                    {
-                        YourID = g.Key.Idticket.ToString(),
-                        VcNo = g.Key.TicketNo,
-                        CusCode = g.Key.CustomerCode,
-                        JobCode = g.Key.SiteCode,
-                        VehicleCode = g.Key.TruckCode,
-                        DriverCode = g.Key.DriverCode,
-                        Note = g.Key.Note,
-                        ProductCode = g.Key.RecipeCode,
-                        Items = g.Select(materialArch => new
-                        {
-                            Code = materialArch.CodeMaterial,
-                            Name = materialArch.NameMaterial,
-                            Quantity = materialArch.PvActualy,
-                            Uom = materialArch.UnitMaterial
-                        }).ToList()
-                    })
-                    .ToList();
-
-                var jsonResultDelivery = JsonConvert.SerializeObject(groupedDelivery);
-                var jsonResultIssue = JsonConvert.SerializeObject(groupedIssue);
+                var jsonResultDelivery = JsonConvert.SerializeObject(queryDelivery);
 
                 using (var client = new HttpClient())
                 {
@@ -152,6 +74,114 @@ namespace HtenTrobzApi
                     var resultDelivery = await responseDelivery.Content.ReadAsStringAsync();
                     var resDelivery = JsonConvert.DeserializeObject<TrobzResponse>(resultDelivery);
 
+                    if (resDelivery != null)
+                    {
+                        if (resDelivery.error == null)
+                        {
+                            tickets.ForEach(ticket => 
+                            {
+                                ticket.Sync = "2";
+                            });
+                        }
+                        else
+                        {
+                            FastErrorLog log = new FastErrorLog()
+                            {
+                                Message = "setDelivery: " + resDelivery.error,
+                                CreatedDate = DateTime.Now,
+                            };
+                            context.FastErrorLogs.Add(log);
+                        }
+
+                        context.SaveChanges();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FastErrorLog log = new FastErrorLog()
+                {
+                    Message = ex.Message,
+                    CreatedDate = DateTime.Now,
+                };
+
+                context.FastErrorLogs.Add(log);
+                context.SaveChanges();
+            }
+        }
+
+        public async Task PushIssueData()
+        {
+            var context = new HtenContext();
+
+            try
+            {
+                var queryIssue = (from ticket in context.Tickets
+                                  join materialArch in context.MaterialArches
+                                  on new { ticket.CodePlant, ticket.PlantNo, SheetNo = (long?)ticket.SheetNo }
+                                  equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId }
+                                  where materialArch.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
+                                  select new
+                                  {
+                                      ticket.Idticket,
+                                      ticket.TicketNo,
+                                      ticket.CustomerCode,
+                                      ticket.SiteCode,
+                                      ticket.TruckCode,
+                                      ticket.DriverCode,
+                                      ticket.OrderDescription01,
+                                      ticket.Note,
+                                      ticket.DateTimeMix,
+                                      ticket.M3Ordered,
+                                      ticket.M3Delivered,
+                                      ticket.RcDescription01,
+                                      materialArch.Id,
+                                      materialArch.CodeMaterial,
+                                      materialArch.NameMaterial,
+                                      materialArch.PvActualy,
+                                      materialArch.UnitMaterial
+                                  }).Take(_configs.MaxRecord);
+
+                var groupedIssue = queryIssue
+                    .GroupBy(ticket => new
+                    {
+                        ticket.Idticket,
+                        ticket.TicketNo,
+                        ticket.CustomerCode,
+                        ticket.SiteCode,
+                        ticket.TruckCode,
+                        ticket.DriverCode,
+                        ticket.OrderDescription01,
+                        ticket.Note,
+                        ticket.DateTimeMix,
+                        ticket.M3Ordered,
+                        ticket.M3Delivered,
+                        ticket.RcDescription01
+                    })
+                    .Select(g => new
+                    {
+                        YourID = g.Key.Idticket.ToString(),
+                        VcNo = g.Key.OrderDescription01,
+                        CusCode = g.Key.CustomerCode,
+                        JobCode = g.Key.SiteCode,
+                        VehicleCode = g.Key.TruckCode,
+                        DriverCode = g.Key.DriverCode,
+                        Note = g.Key.Note,
+                        ProductCode = g.Key.RcDescription01,
+                        Items = g.Select(materialArch => new
+                        {
+                            Code = materialArch.CodeMaterial,
+                            Name = materialArch.NameMaterial,
+                            Quantity = materialArch.PvActualy,
+                            Uom = materialArch.UnitMaterial
+                        }).ToList()
+                    })
+                    .ToList();
+
+                var jsonResultIssue = JsonConvert.SerializeObject(groupedIssue);
+
+                using (var client = new HttpClient())
+                {
                     var contentIssue = new StringContent(jsonResultIssue, Encoding.UTF8, "application/json");
                     var requestIssue = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setIssue")
                     {
@@ -161,41 +191,28 @@ namespace HtenTrobzApi
                     var responseIssue = await client.SendAsync(requestIssue);
                     responseIssue.EnsureSuccessStatusCode();
                     var resultIssue = await responseIssue.Content.ReadAsStringAsync();
-                    var resIssue = JsonConvert.DeserializeObject<TrobzResponse> (resultIssue);
+                    var resIssue = JsonConvert.DeserializeObject<TrobzResponse>(resultIssue);
 
-                    if (resDelivery != null && resIssue != null)
+                    if (resIssue != null)
                     {
-                        if (resDelivery.error == null && resIssue.error == null)
+                        if (resIssue.error == null)
                         {
-                            foreach (var ticket in query.Select(q => q.Idticket).Distinct())
+                            var materialArchIds = queryIssue.Select(q => q.Id).Distinct().ToList();
+                            var materialArches = context.MaterialArches.Where(m => materialArchIds.Contains(m.Id)).ToList();
+
+                            materialArches.ForEach(materialArch =>
                             {
-                                var dbTicket = context.Tickets.FirstOrDefault(t => t.Idticket == ticket);
-                                if (dbTicket != null)
-                                {
-                                    dbTicket.Sync = "2";
-                                }
-                            }
+                                materialArch.Sync = "2";
+                            });
                         }
                         else
                         {
-                            if (resDelivery.error != null)
+                            FastErrorLog log = new FastErrorLog()
                             {
-                                FastErrorLog log = new FastErrorLog()
-                                {
-                                    Message = "setDelivery: " + resDelivery.error,
-                                    CreatedDate = DateTime.Now,
-                                };
-                                context.FastErrorLogs.Add(log);
-                            }
-                            if (resIssue.error != null)
-                            {
-                                FastErrorLog log = new FastErrorLog()
-                                {
-                                    Message = "setIssue: " + resIssue.error,
-                                    CreatedDate = DateTime.Now,
-                                };
-                                context.FastErrorLogs.Add(log);
-                            }
+                                Message = "setIssue: " + resIssue.error,
+                                CreatedDate = DateTime.Now,
+                            };
+                            context.FastErrorLogs.Add(log);
                         }
 
                         context.SaveChanges();
