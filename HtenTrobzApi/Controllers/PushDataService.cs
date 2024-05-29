@@ -20,22 +20,25 @@ namespace HtenTrobzApi
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                _ = PushDeliveryData();
-                _ = PushIssueData();
+                _ = PushData();
                 _ = PushWeightData();
 
                 await Task.Delay(TimeSpan.FromSeconds(_configs.IntervalTimer), stoppingToken);
             }
         }
 
-        public async Task PushDeliveryData()
+        public async Task PushData()
         {
             var context = new HtenContext();
 
             try
             {
-                var tickets = context.Tickets.Where(t => t.Sync != "2" && t.DateTimeMix >= _configs.FromDate).Take(_configs.MaxRecord).ToList();
-                var queryDelivery = tickets.Select(ticket => new
+                var tickets = context.Tickets
+                    .Where(t => t.Sync != "2" && t.DateTimeMix >= _configs.FromDate)
+                    .Take(_configs.MaxRecord)
+                    .ToList();
+
+                var deliveryData = tickets.Select(ticket => new
                 {
                     YourID = ticket.TicketNo + "_" + ticket.CodePlant + "_" + ticket.PlantNo,
                     VcNo = ticket.OrderDescription01,
@@ -60,92 +63,36 @@ namespace HtenTrobzApi
                     }
                 }).ToList();
 
-                var jsonResultDelivery = JsonConvert.SerializeObject(queryDelivery);
+                var jsonDeliveryData = JsonConvert.SerializeObject(deliveryData);
 
-                using (var client = new HttpClient())
-                {
-                    var contentDelivery = new StringContent(jsonResultDelivery, Encoding.UTF8, "application/json");
-                    var requestDelivery = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setDelivery")
-                    {
-                        Content = contentDelivery
-                    };
-                    requestDelivery.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
-                    var responseDelivery = await client.SendAsync(requestDelivery);
-                    responseDelivery.EnsureSuccessStatusCode();
-                    var resultDelivery = await responseDelivery.Content.ReadAsStringAsync();
-                    var resDelivery = JsonConvert.DeserializeObject<TrobzResponse>(resultDelivery);
+                var issueData = (from ticket in tickets
+                                 join materialArch in context.MaterialArches
+                                 on new { ticket.CodePlant, ticket.PlantNo, SheetNo = (long?)ticket.SheetNo }
+                                 equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId }
+                                 select new
+                                 {
+                                     ticket.Idticket,
+                                     ticket.TicketNo,
+                                     ticket.CodePlant,
+                                     ticket.PlantNo,
+                                     ticket.CustomerCode,
+                                     ticket.SiteCode,
+                                     ticket.TruckCode,
+                                     ticket.DriverCode,
+                                     ticket.OrderDescription01,
+                                     ticket.Note,
+                                     ticket.DateTimeMix,
+                                     ticket.M3Ordered,
+                                     ticket.M3Delivered,
+                                     ticket.RcDescription01,
+                                     materialArch.Id,
+                                     materialArch.CodeMaterial,
+                                     materialArch.NameMaterial,
+                                     materialArch.PvActualy,
+                                     materialArch.UnitMaterial
+                                 }).ToList();
 
-                    if (resDelivery != null)
-                    {
-                        if (resDelivery.error == null)
-                        {
-                            tickets.ForEach(ticket => 
-                            {
-                                ticket.Sync = "2";
-                            });
-                        }
-                        else
-                        {
-                            FastErrorLog log = new FastErrorLog()
-                            {
-                                Message = "setDelivery: " + resDelivery.error,
-                                CreatedDate = DateTime.Now,
-                            };
-                            context.FastErrorLogs.Add(log);
-                        }
-
-                        context.SaveChanges();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                FastErrorLog log = new FastErrorLog()
-                {
-                    Message = ex.Message,
-                    CreatedDate = DateTime.Now,
-                };
-
-                context.FastErrorLogs.Add(log);
-                context.SaveChanges();
-            }
-        }
-
-        public async Task PushIssueData()
-        {
-            var context = new HtenContext();
-
-            try
-            {
-                var queryIssue = (from ticket in context.Tickets
-                                  join materialArch in context.MaterialArches
-                                  on new { ticket.CodePlant, ticket.PlantNo, SheetNo = (long?)ticket.SheetNo }
-                                  equals new { materialArch.CodePlant, materialArch.PlantNo, SheetNo = materialArch.SheetId }
-                                  where materialArch.Sync != "2" && ticket.DateTimeMix >= _configs.FromDate
-                                  select new
-                                  {
-                                      ticket.Idticket,
-                                      ticket.TicketNo,
-                                      ticket.CodePlant,
-                                      ticket.PlantNo,
-                                      ticket.CustomerCode,
-                                      ticket.SiteCode,
-                                      ticket.TruckCode,
-                                      ticket.DriverCode,
-                                      ticket.OrderDescription01,
-                                      ticket.Note,
-                                      ticket.DateTimeMix,
-                                      ticket.M3Ordered,
-                                      ticket.M3Delivered,
-                                      ticket.RcDescription01,
-                                      materialArch.Id,
-                                      materialArch.CodeMaterial,
-                                      materialArch.NameMaterial,
-                                      materialArch.PvActualy,
-                                      materialArch.UnitMaterial
-                                  }).Take(_configs.MaxRecord);
-
-                var groupedIssue = queryIssue
+                var groupedIssueData = issueData
                     .GroupBy(ticket => new
                     {
                         ticket.Idticket,
@@ -183,44 +130,67 @@ namespace HtenTrobzApi
                     })
                     .ToList();
 
-                var jsonResultIssue = JsonConvert.SerializeObject(groupedIssue);
+                var jsonIssueData = JsonConvert.SerializeObject(groupedIssueData);
 
                 using (var client = new HttpClient())
                 {
-                    var contentIssue = new StringContent(jsonResultIssue, Encoding.UTF8, "application/json");
-                    var requestIssue = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setIssue")
+                    var deliveryContent = new StringContent(jsonDeliveryData, Encoding.UTF8, "application/json");
+                    var deliveryRequest = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setDelivery")
                     {
-                        Content = contentIssue
+                        Content = deliveryContent
                     };
-                    requestIssue.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
-                    var responseIssue = await client.SendAsync(requestIssue);
-                    responseIssue.EnsureSuccessStatusCode();
-                    var resultIssue = await responseIssue.Content.ReadAsStringAsync();
-                    var resIssue = JsonConvert.DeserializeObject<TrobzResponse>(resultIssue);
+                    deliveryRequest.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
+                    var deliveryResponse = await client.SendAsync(deliveryRequest);
+                    deliveryResponse.EnsureSuccessStatusCode();
+                    var deliveryResult = await deliveryResponse.Content.ReadAsStringAsync();
+                    var deliveryRes = JsonConvert.DeserializeObject<TrobzResponse>(deliveryResult);
 
-                    if (resIssue != null)
+                    var issueContent = new StringContent(jsonIssueData, Encoding.UTF8, "application/json");
+                    var issueRequest = new HttpRequestMessage(HttpMethod.Post, "https://phudoanh-staging.trobz.com/setIssue")
                     {
-                        if (resIssue.error == null)
-                        {
-                            var materialArchIds = queryIssue.Select(q => q.Id).Distinct().ToList();
-                            var materialArches = context.MaterialArches.Where(m => materialArchIds.Contains(m.Id)).ToList();
+                        Content = issueContent
+                    };
+                    issueRequest.Headers.Add("Authorization", "b972feef41f0f0d55acfebf0985ef1b89fb12c84");
+                    var issueResponse = await client.SendAsync(issueRequest);
+                    issueResponse.EnsureSuccessStatusCode();
+                    var issueResult = await issueResponse.Content.ReadAsStringAsync();
+                    var issueRes = JsonConvert.DeserializeObject<TrobzResponse>(issueResult);
 
-                            materialArches.ForEach(materialArch =>
+                    if (deliveryRes != null && issueRes != null)
+                    {
+                        if (deliveryRes.error == null && issueRes.error == null)
+                        {
+                            tickets.ForEach(ticket =>
                             {
-                                materialArch.Sync = "2";
+                                ticket.Sync = "2";
                             });
+
+                            context.SaveChanges();
                         }
                         else
                         {
-                            FastErrorLog log = new FastErrorLog()
+                            if (deliveryRes.error != null)
                             {
-                                Message = "setIssue: " + resIssue.error,
-                                CreatedDate = DateTime.Now,
-                            };
-                            context.FastErrorLogs.Add(log);
-                        }
+                                FastErrorLog log = new FastErrorLog()
+                                {
+                                    Message = "setDelivery: " + deliveryRes.error,
+                                    CreatedDate = DateTime.Now,
+                                };
+                                context.FastErrorLogs.Add(log);
+                            }
 
-                        context.SaveChanges();
+                            if (issueRes.error != null)
+                            {
+                                FastErrorLog log = new FastErrorLog()
+                                {
+                                    Message = "setIssue: " + issueRes.error,
+                                    CreatedDate = DateTime.Now,
+                                };
+                                context.FastErrorLogs.Add(log);
+                            }
+
+                            context.SaveChanges();
+                        }
                     }
                 }
             }
