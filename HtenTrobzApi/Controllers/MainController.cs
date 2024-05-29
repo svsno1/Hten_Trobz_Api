@@ -59,9 +59,13 @@ namespace HtenTrobzApi.Controllers
                     {
                         return HandleDeleteRequest(input, context);
                     }
-                    else
+                    else if (input.type.ToUpper() == "CREATE" || input.type.ToUpper() == "UPDATE")
                     {
                         return await HandleNonDeleteRequestAsync(input, context);
+                    }
+                    else
+                    {
+                        return "Invalid input type";
                     }
                 }
             }
@@ -158,29 +162,30 @@ namespace HtenTrobzApi.Controllers
 
             return input.endpoint switch
             {
-                "getItems" => ProcessItemResponse(jsonResult, input, context, user),
-                "getCustomers" => ProcessCustomerResponse(jsonResult, input, context, user),
-                "getVendors" => ProcessVendorResponse(jsonResult, input, context, user),
-                "getJobs" => ProcessSiteResponse(jsonResult, input, context, user),
-                "getVehicle" => ProcessTruckResponse(jsonResult, input, context, user),
-                "getDrivers" => ProcessDriverResponse(jsonResult, input, context, user),
-                "getSO" => ProcessSOResponse(jsonResult, input, context, user),
+                "getItems" => ProcessItemResponse(jsonResult, context, user),
+                "getCustomers" => ProcessCustomerResponse(jsonResult, context, user),
+                "getVendors" => ProcessVendorResponse(jsonResult, context, user),
+                "getJobs" => ProcessSiteResponse(jsonResult, context, user),
+                "getVehicle" => ProcessTruckResponse(jsonResult, context, user),
+                "getDrivers" => ProcessDriverResponse(jsonResult, context, user),
+                "getSO" => ProcessSOResponse(jsonResult, context, user),
                 _ => "Invalid endpoint"
             };
         }
 
-        private string ProcessItemResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessItemResponse(string jsonResult, HtenContext context, string user)
         {
             var itemRes = JsonConvert.DeserializeObject<ApiReponse<ItemInput>>(jsonResult);
             if (itemRes?.data != null && itemRes.error == null)
             {
                 foreach (var item in itemRes.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    if (item.IsConcrete == 0)
                     {
-                        if (item.IsConcrete == 0)
+                        var material = context.MaterialLists.FirstOrDefault(o => o.ComName == item.ItemCode);
+                        if (material == null)
                         {
-                            var material = new MaterialList
+                            material = new MaterialList
                             {
                                 ComName = item.ItemCode,
                                 Description = item.ItemName,
@@ -190,9 +195,20 @@ namespace HtenTrobzApi.Controllers
                             };
                             context.MaterialLists.Add(material);
                         }
-                        else if (item.IsConcrete == 1)
+                        else
                         {
-                            var gradeSale = new GradeSale
+                            material.Description = item.ItemName;
+                            material.Unit = item.Uom?.Name;
+                            material.Density = item.Uom?.Ratio;
+                            material.TypeMaterial = item.Category?.TypeMat;
+                        }
+                    }
+                    else if (item.IsConcrete == 1)
+                    {
+                        var gradeSale = context.GradeSales.FirstOrDefault(o => o.Code == item.ItemCode);
+                        if (gradeSale == null)
+                        {
+                            gradeSale = new GradeSale
                             {
                                 Code = item.ItemCode,
                                 Description01 = item.ItemName,
@@ -205,33 +221,15 @@ namespace HtenTrobzApi.Controllers
                             };
                             context.GradeSales.Add(gradeSale);
                         }
-                    }
-                    else if (input.type.ToUpper() == "UPDATE")
-                    {
-                        if (item.IsConcrete == 0)
+                        else
                         {
-                            var material = context.MaterialLists.FirstOrDefault(o => o.ComName == item.ItemCode);
-                            if (material != null)
-                            {
-                                material.Description = item.ItemName;
-                                material.Unit = item.Uom?.Name;
-                                material.Density = item.Uom?.Ratio;
-                                material.TypeMaterial = item.Category?.TypeMat;
-                            }
-                        }
-                        else if (item.IsConcrete == 1)
-                        {
-                            var gradeSale = context.GradeSales.FirstOrDefault(o => o.Code == item.ItemCode);
-                            if (gradeSale != null)
-                            {
-                                gradeSale.Description01 = item.ItemName;
-                                gradeSale.Description02 = item.SaleDescription;
-                                gradeSale.Type = item.Category?.TypeMat;
-                                gradeSale.Slump = item.Settlement;
-                                gradeSale.Note = item.Note;
-                                gradeSale.LastModifyLog = DateTime.Now;
-                                gradeSale.UserChange = user;
-                            }
+                            gradeSale.Description01 = item.ItemName;
+                            gradeSale.Description02 = item.SaleDescription;
+                            gradeSale.Type = item.Category?.TypeMat;
+                            gradeSale.Slump = item.Settlement;
+                            gradeSale.Note = item.Note;
+                            gradeSale.LastModifyLog = DateTime.Now;
+                            gradeSale.UserChange = user;
                         }
                     }
                 }
@@ -243,16 +241,17 @@ namespace HtenTrobzApi.Controllers
             return "Error processing items";
         }
 
-        private string ProcessCustomerResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessCustomerResponse(string jsonResult, HtenContext context, string user)
         {
             var customerRes = JsonConvert.DeserializeObject<ApiReponse<CustomerInput>>(jsonResult);
             if (customerRes?.data != null && customerRes.error == null)
             {
                 foreach (var item in customerRes.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    var customer = context.Customers.FirstOrDefault(o => o.Code == item.CusCode);
+                    if (customer == null)
                     {
-                        var customer = new Customer
+                        customer = new Customer
                         {
                             Code = item.CusCode,
                             Name = item.CusName,
@@ -264,18 +263,14 @@ namespace HtenTrobzApi.Controllers
                         };
                         context.Customers.Add(customer);
                     }
-                    else if (input.type.ToUpper() == "UPDATE")
+                    else
                     {
-                        var customer = context.Customers.FirstOrDefault(o => o.Code == item.CusCode);
-                        if (customer != null)
-                        {
-                            customer.Name = item.CusName;
-                            customer.AddressLine1 = item.Address;
-                            customer.Telephone = item.Phone;
-                            customer.Note = item.Note;
-                            customer.LastModifyLog = DateTime.Now;
-                            customer.UserChange = user;
-                        }
+                        customer.Name = item.CusName;
+                        customer.AddressLine1 = item.Address;
+                        customer.Telephone = item.Phone;
+                        customer.Note = item.Note;
+                        customer.LastModifyLog = DateTime.Now;
+                        customer.UserChange = user;
                     }
                 }
 
@@ -286,16 +281,17 @@ namespace HtenTrobzApi.Controllers
             return "Error processing customers";
         }
 
-        private string ProcessVendorResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessVendorResponse(string jsonResult, HtenContext context, string user)
         {
             var res = JsonConvert.DeserializeObject<ApiReponse<VendorInput>>(jsonResult);
             if (res?.data != null && res.error == null)
             {
                 foreach (var item in res.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    var provider = context.TblProviders.FirstOrDefault(o => o.Code == item.VendorCode);
+                    if (provider == null)
                     {
-                        var provider = new TblProvider
+                        provider = new TblProvider
                         {
                             Code = item.VendorCode,
                             Name = item.VendorName,
@@ -307,18 +303,14 @@ namespace HtenTrobzApi.Controllers
                         };
                         context.TblProviders.Add(provider);
                     }
-                    else if (input.type.ToUpper() == "UPDATE")
+                    else
                     {
-                        var provider = context.TblProviders.FirstOrDefault(o => o.Code == item.VendorCode);
-                        if (provider != null)
-                        {
-                            provider.Name = item.VendorName;
-                            provider.Address = item.Address;
-                            provider.Contact = item.Phone;
-                            provider.Note = item.Note;
-                            provider.LastModifyLog = DateTime.Now;
-                            provider.UserChanged = user;
-                        }
+                        provider.Name = item.VendorName;
+                        provider.Address = item.Address;
+                        provider.Contact = item.Phone;
+                        provider.Note = item.Note;
+                        provider.LastModifyLog = DateTime.Now;
+                        provider.UserChanged = user;
                     }
                 }
 
@@ -326,19 +318,20 @@ namespace HtenTrobzApi.Controllers
                 return "OK";
             }
 
-            return "Error processing customers";
+            return "Error processing vendors";
         }
 
-        private string ProcessSiteResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessSiteResponse(string jsonResult, HtenContext context, string user)
         {
             var siteRes = JsonConvert.DeserializeObject<ApiReponse<SiteInput>>(jsonResult);
             if (siteRes?.data != null && siteRes.error == null)
             {
                 foreach (var item in siteRes.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    var site = context.Sites.FirstOrDefault(o => o.Code == item.JobCode);
+                    if (site == null)
                     {
-                        var site = new Site
+                        site = new Site
                         {
                             Code = item.JobCode,
                             Name = item.JobName,
@@ -348,16 +341,12 @@ namespace HtenTrobzApi.Controllers
                         };
                         context.Sites.Add(site);
                     }
-                    else if (input.type.ToUpper() == "UPDATE")
+                    else
                     {
-                        var site = context.Sites.FirstOrDefault(o => o.Code == item.JobCode);
-                        if (site != null)
-                        {
-                            site.Name = item.JobName;
-                            site.AddressLine1 = item.JobAddress;
-                            site.LastModifyLog = DateTime.Now;
-                            site.UserChange = user;
-                        }
+                        site.Name = item.JobName;
+                        site.AddressLine1 = item.JobAddress;
+                        site.LastModifyLog = DateTime.Now;
+                        site.UserChange = user;
                     }
                 }
 
@@ -368,16 +357,17 @@ namespace HtenTrobzApi.Controllers
             return "Error processing sites";
         }
 
-        private string ProcessTruckResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessTruckResponse(string jsonResult, HtenContext context, string user)
         {
             var res = JsonConvert.DeserializeObject<ApiReponse<TruckInput>>(jsonResult);
             if (res?.data != null && res.error == null)
             {
                 foreach (var item in res.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    var truck = context.Trucks.FirstOrDefault(o => o.Code == item.CarCode);
+                    if (truck == null)
                     {
-                        var truck = new Truck
+                        truck = new Truck
                         {
                             Code = item.CarCode,
                             PlateNumber = item.CarNo,
@@ -388,17 +378,13 @@ namespace HtenTrobzApi.Controllers
                         };
                         context.Trucks.Add(truck);
                     }
-                    else if (input.type.ToUpper() == "UPDATE")
+                    else
                     {
-                        var truck = context.Trucks.FirstOrDefault(o => o.Code == item.CarCode);
-                        if (truck != null)
-                        {
-                            truck.PlateNumber = item.CarNo;
-                            truck.Capacity = item.Capacity;
-                            truck.DriverCode = item.Driver?.Code;
-                            truck.LastModifyLog = DateTime.Now;
-                            truck.UserChange = user;
-                        }
+                        truck.PlateNumber = item.CarNo;
+                        truck.Capacity = item.Capacity;
+                        truck.DriverCode = item.Driver?.Code;
+                        truck.LastModifyLog = DateTime.Now;
+                        truck.UserChange = user;
                     }
                 }
 
@@ -409,16 +395,17 @@ namespace HtenTrobzApi.Controllers
             return "Error processing trucks";
         }
 
-        private string ProcessDriverResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessDriverResponse(string jsonResult, HtenContext context, string user)
         {
             var res = JsonConvert.DeserializeObject<ApiReponse<DriverInput>>(jsonResult);
             if (res?.data != null && res.error == null)
             {
                 foreach (var item in res.data)
                 {
-                    if (input.type.ToUpper() == "CREATE")
+                    var driver = context.Drivers.FirstOrDefault(o => o.Code == item.DriverCode);
+                    if (driver == null)
                     {
-                        var driver = new Driver
+                        driver = new Driver
                         {
                             Code = item.DriverCode,
                             Name = item.DriverName,
@@ -427,15 +414,11 @@ namespace HtenTrobzApi.Controllers
                         };
                         context.Drivers.Add(driver);
                     }
-                    else if (input.type.ToUpper() == "UPDATE")
+                    else
                     {
-                        var driver = context.Drivers.FirstOrDefault(o => o.Code == item.DriverCode);
-                        if (driver != null)
-                        {
-                            driver.Name = item.DriverName;
-                            driver.LastModifyLog = DateTime.Now;
-                            driver.UserChange = user;
-                        }
+                        driver.Name = item.DriverName;
+                        driver.LastModifyLog = DateTime.Now;
+                        driver.UserChange = user;
                     }
                 }
 
@@ -446,18 +429,16 @@ namespace HtenTrobzApi.Controllers
             return "Error processing drivers";
         }
 
-        private string ProcessSOResponse(string jsonResult, ApiInput input, HtenContext context, string user)
+        private string ProcessSOResponse(string jsonResult, HtenContext context, string user)
         {
             var res = JsonConvert.DeserializeObject<ApiReponse<SOInput>>(jsonResult);
             if (res?.data != null && res.error == null)
             {
-                bool isCreate = input.type.ToUpper() == "CREATE";
-
                 foreach (var item in res.data)
                 {
-                    SaleContract? contract;
+                    var contract = context.SaleContracts.FirstOrDefault(o => o.Code == item.VcNo);
 
-                    if (isCreate)
+                    if (contract == null)
                     {
                         contract = new SaleContract
                         {
@@ -471,18 +452,15 @@ namespace HtenTrobzApi.Controllers
                     }
                     else
                     {
-                        contract = context.SaleContracts.FirstOrDefault(o => o.Code == item.VcNo);
-                        if (contract != null)
-                        {
-                            contract.OrderDate = item.VcDate;
-                            contract.CustomerCode = item.Customer?.Code;
-                            contract.LastModifyLog = DateTime.Now;
-                            contract.UserChange = user;
+                        // Update existing contract
+                        contract.OrderDate = item.VcDate;
+                        contract.CustomerCode = item.Customer?.Code;
+                        contract.LastModifyLog = DateTime.Now;
+                        contract.UserChange = user;
 
-                            // Remove existing details
-                            var existingDetails = context.SaleContractDetails.Where(o => o.SaleContractCode == item.VcNo).ToList();
-                            context.SaleContractDetails.RemoveRange(existingDetails);
-                        }
+                        // Remove existing details
+                        var existingDetails = context.SaleContractDetails.Where(o => o.SaleContractCode == item.VcNo).ToList();
+                        context.SaleContractDetails.RemoveRange(existingDetails);
                     }
 
                     // Add new contract details
@@ -504,6 +482,5 @@ namespace HtenTrobzApi.Controllers
 
             return "Error processing SO";
         }
-
     }
 }

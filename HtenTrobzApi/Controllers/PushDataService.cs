@@ -2,6 +2,7 @@
 using HtenTrobzApi.TruckModels;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using System.Net.Sockets;
 using System.Text;
 
 namespace HtenTrobzApi
@@ -36,7 +37,7 @@ namespace HtenTrobzApi
                 var tickets = context.Tickets.Where(t => t.Sync != "2" && t.DateTimeMix >= _configs.FromDate).Take(_configs.MaxRecord).ToList();
                 var queryDelivery = tickets.Select(ticket => new
                 {
-                    YourID = ticket.Idticket.ToString(),
+                    YourID = ticket.TicketNo + "_" + ticket.CodePlant + "_" + ticket.PlantNo,
                     VcNo = ticket.OrderDescription01,
                     CusCode = ticket.CustomerCode,
                     JobCode = ticket.SiteCode,
@@ -125,6 +126,8 @@ namespace HtenTrobzApi
                                   {
                                       ticket.Idticket,
                                       ticket.TicketNo,
+                                      ticket.CodePlant,
+                                      ticket.PlantNo,
                                       ticket.CustomerCode,
                                       ticket.SiteCode,
                                       ticket.TruckCode,
@@ -147,6 +150,8 @@ namespace HtenTrobzApi
                     {
                         ticket.Idticket,
                         ticket.TicketNo,
+                        ticket.CodePlant,
+                        ticket.PlantNo,
                         ticket.CustomerCode,
                         ticket.SiteCode,
                         ticket.TruckCode,
@@ -160,7 +165,7 @@ namespace HtenTrobzApi
                     })
                     .Select(g => new
                     {
-                        YourID = g.Key.Idticket.ToString(),
+                        YourID = g.Key.TicketNo + "_" + g.Key.CodePlant + "_" + g.Key.PlantNo,
                         VcNo = g.Key.OrderDescription01,
                         CusCode = g.Key.CustomerCode,
                         JobCode = g.Key.SiteCode,
