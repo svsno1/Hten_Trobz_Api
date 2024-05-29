@@ -20,7 +20,7 @@ namespace HtenTrobzApi
             while (!stoppingToken.IsCancellationRequested)
             {
                 _ = PushDeliveryData();
-                //_ = PushWeightData();
+                _ = PushWeightData();
 
                 await Task.Delay(TimeSpan.FromSeconds(_configs.IntervalTimer), stoppingToken);
             }
@@ -62,20 +62,20 @@ namespace HtenTrobzApi
                      .ToList();
 
                 var groupedDelivery = query
-                    .GroupBy(x => new
+                    .GroupBy(ticket => new
                     {
-                        x.Idticket,
-                        x.TicketNo,
-                        x.CustomerCode,
-                        x.SiteCode,
-                        x.TruckCode,
-                        x.DriverCode,
-                        x.OrderDescription01,
-                        x.Note,
-                        x.DateTimeMix,
-                        x.M3Ordered,
-                        x.M3Delivered,
-                        x.RecipeCode
+                        ticket.Idticket,
+                        ticket.TicketNo,
+                        ticket.CustomerCode,
+                        ticket.SiteCode,
+                        ticket.TruckCode,
+                        ticket.DriverCode,
+                        ticket.OrderDescription01,
+                        ticket.Note,
+                        ticket.DateTimeMix,
+                        ticket.M3Ordered,
+                        ticket.M3Delivered,
+                        ticket.RecipeCode
                     })
                     .Select(g => new
                     {
@@ -87,13 +87,13 @@ namespace HtenTrobzApi
                         DriverCode = g.Key.DriverCode,
                         ContractCode = g.Key.OrderDescription01,
                         Note = g.Key.Note,
-                        VcDate = g.Key.DateTimeMix,
+                        VcDate = (g.Key.DateTimeMix ?? new DateTime(1900,1,1)).ToString("yyyy-MM-dd"),
                         Status = "done",
-                        Items = g.Select(x => new
+                        Items = g.Select(materialArch => new
                         {
-                            Code = x.CodeMaterial,
-                            Quantity = x.PvActualy,
-                            Uom = x.UnitMaterial,
+                            Code = materialArch.CodeMaterial,
+                            Quantity = materialArch.PvActualy,
+                            Uom = materialArch.UnitMaterial,
                             Sl_Dat = g.Key.M3Ordered,
                             AccumulatedQTY = g.Key.M3Delivered
                         }).ToList()
@@ -101,20 +101,20 @@ namespace HtenTrobzApi
                     .ToList();
 
                 var groupedIssue = query
-                    .GroupBy(x => new
+                    .GroupBy(ticket => new
                     {
-                        x.Idticket,
-                        x.TicketNo,
-                        x.CustomerCode,
-                        x.SiteCode,
-                        x.TruckCode,
-                        x.DriverCode,
-                        x.OrderDescription01,
-                        x.Note,
-                        x.DateTimeMix,
-                        x.M3Ordered,
-                        x.M3Delivered,
-                        x.RecipeCode
+                        ticket.Idticket,
+                        ticket.TicketNo,
+                        ticket.CustomerCode,
+                        ticket.SiteCode,
+                        ticket.TruckCode,
+                        ticket.DriverCode,
+                        ticket.OrderDescription01,
+                        ticket.Note,
+                        ticket.DateTimeMix,
+                        ticket.M3Ordered,
+                        ticket.M3Delivered,
+                        ticket.RecipeCode
                     })
                     .Select(g => new
                     {
@@ -126,18 +126,18 @@ namespace HtenTrobzApi
                         DriverCode = g.Key.DriverCode,
                         Note = g.Key.Note,
                         ProductCode = g.Key.RecipeCode,
-                        Items = g.Select(x => new
+                        Items = g.Select(materialArch => new
                         {
-                            Code = x.CodeMaterial,
-                            Name = x.NameMaterial,
-                            Quantity = x.PvActualy,
-                            Uom = x.UnitMaterial
+                            Code = materialArch.CodeMaterial,
+                            Name = materialArch.NameMaterial,
+                            Quantity = materialArch.PvActualy,
+                            Uom = materialArch.UnitMaterial
                         }).ToList()
                     })
                     .ToList();
 
-                var jsonResultDelivery = Newtonsoft.Json.JsonConvert.SerializeObject(groupedDelivery);
-                var jsonResultIssue = Newtonsoft.Json.JsonConvert.SerializeObject(groupedIssue);
+                var jsonResultDelivery = JsonConvert.SerializeObject(groupedDelivery);
+                var jsonResultIssue = JsonConvert.SerializeObject(groupedIssue);
 
                 using (var client = new HttpClient())
                 {
@@ -163,16 +163,41 @@ namespace HtenTrobzApi
                     var resultIssue = await responseIssue.Content.ReadAsStringAsync();
                     var resIssue = JsonConvert.DeserializeObject<TrobzResponse> (resultIssue);
 
-                    if (resDelivery != null && resDelivery.error == null && resIssue != null && resIssue.error == null)
+                    if (resDelivery != null && resIssue != null)
                     {
-                        foreach (var ticket in query.Select(q => q.Idticket).Distinct())
+                        if (resDelivery.error == null && resIssue.error == null)
                         {
-                            var dbTicket = context.Tickets.FirstOrDefault(t => t.Idticket == ticket);
-                            if (dbTicket != null)
+                            foreach (var ticket in query.Select(q => q.Idticket).Distinct())
                             {
-                                dbTicket.Sync = "2";
+                                var dbTicket = context.Tickets.FirstOrDefault(t => t.Idticket == ticket);
+                                if (dbTicket != null)
+                                {
+                                    dbTicket.Sync = "2";
+                                }
                             }
                         }
+                        else
+                        {
+                            if (resDelivery.error != null)
+                            {
+                                FastErrorLog log = new FastErrorLog()
+                                {
+                                    Message = "setDelivery: " + resDelivery.error,
+                                    CreatedDate = DateTime.Now,
+                                };
+                                context.FastErrorLogs.Add(log);
+                            }
+                            if (resIssue.error != null)
+                            {
+                                FastErrorLog log = new FastErrorLog()
+                                {
+                                    Message = "setIssue: " + resIssue.error,
+                                    CreatedDate = DateTime.Now,
+                                };
+                                context.FastErrorLogs.Add(log);
+                            }
+                        }
+
                         context.SaveChanges();
                     }
                 }
@@ -199,8 +224,7 @@ namespace HtenTrobzApi
             {
                 var query = (from ticket in truckContext.TblTickets
                              join material in truckContext.TblMaterials on ticket.MaterialRef equals material.Id
-                             join provider in truckContext.TblProviders on ticket.ProviderRef equals provider.Id into providerGroup
-                             from provider in providerGroup.DefaultIfEmpty()
+                             join provider in truckContext.TblProviders on ticket.ProviderRef equals provider.Id
                              join user in truckContext.TblUsers on ticket.GrossOperConfirm equals user.Id into userGroup
                              from user in userGroup.DefaultIfEmpty()
                              join delivery in truckContext.TblTicketReceivedCbps on ticket.SheetNoCbp equals delivery.Idticket into deliveryGroup
@@ -209,8 +233,8 @@ namespace HtenTrobzApi
                              select new
                              {
                                  ticket.Code,
-                                 POCode = delivery.OrderDescription01 ?? "",
-                                 SOCode = delivery.OrderNo ?? "",
+                                 POCode = delivery.OrderDescription01,
+                                 SOCode = delivery.OrderNo,
                                  MatCode = material.Code,
                                  MatName = material.Name,
                                  ticket.MatGroup,
@@ -218,7 +242,7 @@ namespace HtenTrobzApi
                                  Uom = "kg",
                                  VendorName = provider.Name,
                                  TruckPlateNo = ticket.TruckPlateNumber,
-                                 ticket.GrossDatetime,
+                                 GrossDatetime = (ticket.GrossDatetime ?? new DateTime(1900, 1, 1)).ToString("yyyy-MM-dd HH:mm:ss"),
                                  ticket.DriverName,
                                  EmployeeName = user.UserName,
                                  LeadSealNo = ticket.KepChi,
@@ -227,7 +251,7 @@ namespace HtenTrobzApi
                          .Take(_configs.MaxRecord)
                          .ToList();
 
-                var jsonResult = Newtonsoft.Json.JsonConvert.SerializeObject(query);
+                var jsonResult = JsonConvert.SerializeObject(query);
 
                 using (var client = new HttpClient())
                 {
@@ -242,17 +266,30 @@ namespace HtenTrobzApi
                     var result = await response.Content.ReadAsStringAsync();
                     var res = JsonConvert.DeserializeObject<TrobzResponse>(result);
 
-                    if (res != null && res.error == null)
+                    if (res != null)
                     {
-                        var ticketCodes = query.Select(q => q.Code).ToList();
-                        var ticketsToUpdate = truckContext.TblTickets.Where(t => ticketCodes.Contains(t.Code)).ToList();
-
-                        foreach (var ticket in ticketsToUpdate)
+                        if (res.error == null)
                         {
-                            ticket.Sync = "2";
-                        }
+                            var ticketCodes = query.Select(q => q.Code).ToList();
+                            var ticketsToUpdate = truckContext.TblTickets.Where(t => ticketCodes.Contains(t.Code)).ToList();
 
-                        truckContext.SaveChanges();
+                            foreach (var ticket in ticketsToUpdate)
+                            {
+                                ticket.Sync = "2";
+                            }
+
+                            truckContext.SaveChanges();
+                        }
+                        else
+                        {
+                            FastErrorLog log = new FastErrorLog()
+                            {
+                                Message = "setWeighbridge: " + res.error,
+                                CreatedDate = DateTime.Now,
+                            };
+                            context.FastErrorLogs.Add(log);
+                            context.SaveChanges();
+                        }
                     }
                 }
             }
